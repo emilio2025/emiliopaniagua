@@ -288,10 +288,51 @@ export async function fetchOrder(id: string, signal?: AbortSignal): Promise<Orde
   return parseOrder(response.payload);
 }
 
+export interface InvoiceLine {
+  product_id: string;
+  name: string;
+  quantity: number;
+  unit_price_cents: number;
+}
+
+export interface InvoicePreview {
+  id: string;
+  number: string;
+  issuer_id: string;
+  order_id: string;
+  currency: string;
+  items: InvoiceLine[];
+  total_cents: number;
+  status: string;
+  created_at: string;
+}
+
 export interface BillingInfo {
   billing_status: 'pending' | 'issued' | 'failed' | 'not_applicable';
   invoice_number: string | null;
   error: string | null;
+  invoice: InvoicePreview | null;
+}
+
+function parseInvoice(value: unknown): InvoicePreview | null {
+  if (!isRecord(value) || !Array.isArray(value.items)) {
+    return null;
+  }
+  try {
+    return {
+      id: readString(value, 'id'),
+      number: readString(value, 'number'),
+      issuer_id: readString(value, 'issuer_id'),
+      order_id: readString(value, 'order_id'),
+      currency: readString(value, 'currency'),
+      items: value.items.map(parseOrderLine),
+      total_cents: readInteger(value, 'total_cents', 0),
+      status: readString(value, 'status'),
+      created_at: readString(value, 'created_at')
+    };
+  } catch {
+    return null;
+  }
 }
 
 function optionalString(record: Record<string, unknown>, key: string): string | null {
@@ -314,7 +355,8 @@ export async function fetchBilling(id: string, signal?: AbortSignal): Promise<Bi
   return {
     billing_status: status,
     invoice_number: optionalString(value, 'invoice_number'),
-    error: optionalString(value, 'error')
+    error: optionalString(value, 'error'),
+    invoice: parseInvoice(value.invoice)
   };
 }
 

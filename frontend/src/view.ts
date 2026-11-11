@@ -1,4 +1,4 @@
-import type { BillingInfo } from './api';
+import type { BillingInfo, InvoicePreview } from './api';
 import type { CartProblem } from './cart';
 import {
   MAX_DISTINCT_PRODUCTS,
@@ -671,7 +671,66 @@ export function billingNode(info: BillingInfo | null): HTMLElement {
     ),
     el('p', { class: 'notice-text' }, detail)
   );
+  if (info?.invoice) {
+    wrapper.append(invoicePreviewNode(info.invoice));
+  }
   return wrapper;
+}
+
+function invoicePreviewNode(invoice: InvoicePreview): HTMLElement {
+  const lines = el('ul', { class: 'receipt-items' });
+  for (const line of invoice.items) {
+    lines.append(
+      el(
+        'li',
+        { class: 'receipt-item' },
+        el(
+          'div',
+          { class: 'receipt-item-main' },
+          el('span', { class: 'receipt-item-name' }, line.name),
+          el(
+            'span',
+            { class: 'receipt-item-meta' },
+            `${line.product_id} · ${line.quantity} × ${formatMoney(line.unit_price_cents)}`
+          )
+        ),
+        el('span', { class: 'receipt-line-total' }, formatMoney(line.unit_price_cents * line.quantity))
+      )
+    );
+  }
+  const row = (label: string, value: string): HTMLElement =>
+    el('div', { class: 'invoice-row' }, el('span', {}, label), el('strong', {}, value));
+  return el(
+    'section',
+    { class: 'invoice-preview', 'aria-label': 'Vista previa del comprobante' },
+    el(
+      'header',
+      { class: 'invoice-head' },
+      el('p', { class: 'invoice-kicker' }, 'Comprobante de demostración'),
+      el('p', { class: 'invoice-number' }, invoice.number)
+    ),
+    el(
+      'div',
+      { class: 'invoice-meta' },
+      row('Emisor', invoice.issuer_id),
+      row('Fecha', formatDateTime(invoice.created_at)),
+      row('Pedido', invoice.order_id),
+      row('Moneda', invoice.currency),
+      row('Estado', invoice.status === 'issued' ? 'Emitido' : invoice.status)
+    ),
+    lines,
+    el(
+      'div',
+      { class: 'receipt-total' },
+      el('span', {}, 'Total facturado'),
+      el('strong', {}, formatMoney(invoice.total_cents))
+    ),
+    el(
+      'p',
+      { class: 'invoice-foot' },
+      'Emitido por el microservicio de facturación (Supabase). No es un comprobante SUNAT ni incluye IGV.'
+    )
+  );
 }
 
 function notificationInfo(status: NotificationStatus): {

@@ -228,13 +228,42 @@ async def request_manual_retry(
             return record.status
 
 
+INVOICE_FIELDS = ("id", "number", "issuer_id", "order_id", "currency", "items", "total_cents", "status", "created_at")
+
+
+async def fetch_invoice(settings: Settings, invoice_id: str) -> dict[str, Any] | None:
+    """Consulta el comprobante emitido (GET /invoices/{id}) para la vista previa."""
+    if not is_configured(settings):
+        return None
+    try:
+        uuid.UUID(invoice_id)
+    except (ValueError, TypeError):
+        return None
+    url = f"{settings.billing_base_url.rstrip('/')}/invoices/{invoice_id}"
+    try:
+        async with httpx.AsyncClient(timeout=min(settings.billing_timeout_seconds, 8.0)) as client:
+            response = await client.get(url, headers={"X-Billing-Token": settings.billing_token_value()})
+    except httpx.HTTPError:
+        return None
+    if response.status_code != 200:
+        return None
+    try:
+        invoice = response.json()
+    except ValueError:
+        return None
+    if not isinstance(invoice, dict):
+        return None
+    return {key: invoice.get(key) for key in INVOICE_FIELDS}
+
+
 def public_billing_view(record: BillingRecord | None, settings: Settings) -> dict[str, Any]:
     if record is None:
-        return {"billing_status": "not_applicable", "invoice_id": None, "invoice_number": None, "error": None}
+        return {"billing_status": "not_applicable", "invoice_id": None, "invoice_number": None, "error": None, "invoice": None}
     error = record.last_error
     if record.status == PENDING and not is_configured(settings):
         error = "BILLING_NOT_CONFIGURED"
     return {
+        "invoice": None,
         "billing_status": record.status,
         "invoice_id": record.invoice_id,
         "invoice_number": record.invoice_number,

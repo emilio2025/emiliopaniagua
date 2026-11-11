@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import CAMPAIGN, utcnow
 from .events import build_order_created_event, iso8601
-from .billing import build_invoice_request, public_billing_view
+from .billing import build_invoice_request, fetch_invoice, public_billing_view
 from .models import BillingRecord, Order, OrderItem, Outbox, Product
 from .schemas import OrderCreate
 from .security import (
@@ -299,4 +299,9 @@ async def get_order_billing(
 
     record = await session.get(BillingRecord, identifier)
     settings = request.app.state.settings
-    return JSONResponse(content={"order_id": str(identifier), **public_billing_view(record, settings)})
+    view = public_billing_view(record, settings)
+    if record is not None and record.status == "issued" and record.invoice_id:
+        # Vista previa: el backend consulta el comprobante al microservicio; el
+        # navegador nunca ve el token ni llama a Supabase.
+        view["invoice"] = await fetch_invoice(settings, record.invoice_id)
+    return JSONResponse(content={"order_id": str(identifier), **view})
