@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .config import Settings
 from .db import PUBLIC_DATASET, utcnow
-from .models import EventRecord, Notification, Order, OrderItem, Outbox, Product, Run
+from .models import BillingRecord, EventRecord, Notification, Order, OrderItem, Outbox, Product, Run
 
 logger = logging.getLogger(__name__)
 
@@ -392,6 +392,7 @@ async def delete_dataset_rows(session: AsyncSession, dataset_ids: list[str]) -> 
     if not safe_ids:
         return
     order_ids = select(Order.id).where(Order.dataset_id.in_(safe_ids))
+    await session.execute(delete(BillingRecord).where(BillingRecord.dataset_id.in_(safe_ids)))
     await session.execute(delete(Notification).where(Notification.dataset_id.in_(safe_ids)))
     await session.execute(delete(EventRecord).where(EventRecord.dataset_id.in_(safe_ids)))
     await session.execute(delete(Outbox).where(Outbox.dataset_id.in_(safe_ids)))

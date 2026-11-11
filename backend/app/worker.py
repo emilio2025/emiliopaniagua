@@ -5,6 +5,7 @@ import logging
 
 from redis.asyncio import Redis
 
+from .billing import process_pending_billing
 from .config import Settings, get_settings
 from .db import Database
 from .events import (
@@ -117,6 +118,18 @@ async def cleanup_loop(database: Database, settings: Settings) -> None:
         await asyncio.sleep(30.0)
 
 
+async def billing_loop(database: Database, settings: Settings) -> None:
+    """Semana 11: envía las tareas de facturación pendientes, sin bloquear notificaciones."""
+    while True:
+        try:
+            await process_pending_billing(database.session_factory, settings)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.warning("billing error type=%s", type(exc).__name__)
+        await asyncio.sleep(settings.billing_poll_seconds)
+
+
 async def run_worker() -> None:
     settings = get_settings()
     logging.basicConfig(
@@ -151,6 +164,7 @@ async def run_worker() -> None:
             relay_loop(database, client, settings),
             consumer_loop(database, client, settings),
             cleanup_loop(database, settings),
+            billing_loop(database, settings),
         )
     finally:
         await client.aclose()

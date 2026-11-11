@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     db_pool_size: int = Field(default=10, ge=1, le=100)
     db_max_overflow: int = Field(default=20, ge=0, le=200)
 
+    # Semana 11: microservicio de facturación (vacío = facturación no configurada).
+    billing_base_url: str = ""
+    billing_token: SecretStr = SecretStr("")
+    billing_timeout_seconds: float = Field(default=15.0, ge=1.0, le=60.0)
+    billing_retry_backoff_seconds: float = Field(default=1.0, ge=0.0, le=30.0)
+    billing_poll_seconds: float = Field(default=2.0, ge=0.2, le=60.0)
+
     @field_validator("database_url")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:
@@ -82,6 +89,17 @@ class Settings(BaseSettings):
 
     def lab_key_value(self) -> str:
         return self.lab_key.get_secret_value()
+
+    def billing_token_value(self) -> str:
+        return self.billing_token.get_secret_value().strip()
+
+    @field_validator("billing_base_url")
+    @classmethod
+    def validate_billing_base_url(cls, value: str) -> str:
+        value = value.strip().rstrip("/")
+        if value and not (value.startswith("https://") or value.startswith("http://127.0.0.1") or value.startswith("http://localhost")):
+            raise ValueError("BILLING_BASE_URL must use HTTPS")
+        return value
 
 
 @lru_cache(maxsize=1)

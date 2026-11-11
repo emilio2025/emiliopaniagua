@@ -1,6 +1,7 @@
 import '@fontsource-variable/manrope';
 import './styles.css';
-import { ApiError, createOrder, fetchCatalog, fetchOrder, friendlyError, isAbortError } from './api';
+import { ApiError, createOrder, fetchBilling, fetchCatalog, fetchOrder, friendlyError, isAbortError } from './api';
+import type { BillingInfo } from './api';
 import {
   MAX_DISTINCT_PRODUCTS,
   addLine,
@@ -29,6 +30,7 @@ import type { AttemptRecord } from './storage';
 import type { CartLine, Catalog, Order, Product } from './types';
 import {
   applyStockChip,
+  billingNode,
   cartPanelNodes,
   configureAddButton,
   emptyCatalogNode,
@@ -72,6 +74,9 @@ let pollTimer: number | null = null;
 let pollToken = 0;
 let pollAttempts = 0;
 let lastFocused: HTMLElement | null = null;
+let billingInfo: BillingInfo | null = null;
+let billingToken = 0;
+let billingTimer: number | null = null;
 let toastTimer: number | null = null;
 
 const ui: Elements = buildShell();
@@ -722,6 +727,51 @@ function renderPanel(resetScroll: boolean): void {
     ui.panel.removeAttribute('aria-busy');
   }
   renderPanelBody(resetScroll);
+  updateReceiptBilling();
+}
+
+function updateReceiptBilling(): void {
+  if (panelMode !== 'receipt') {
+    return;
+  }
+  const current = ui.panelBody.querySelector('[data-receipt-billing]');
+  if (current) {
+    current.replaceWith(billingNode(billingInfo));
+  }
+}
+
+function startBillingPoll(orderId: string): void {
+  billingToken += 1;
+  const token = billingToken;
+  billingInfo = null;
+  if (billingTimer !== null) {
+    window.clearTimeout(billingTimer);
+    billingTimer = null;
+  }
+  let attempts = 0;
+  const tick = async (): Promise<void> => {
+    if (token !== billingToken) {
+      return;
+    }
+    attempts += 1;
+    try {
+      billingInfo = await fetchBilling(orderId);
+    } catch {
+      billingInfo = billingInfo ?? null;
+    }
+    if (token !== billingToken) {
+      return;
+    }
+    updateReceiptBilling();
+    if (billingInfo?.billing_status === 'pending' && attempts < maxPollAttempts) {
+      billingTimer = window.setTimeout(() => {
+        void tick();
+      }, pollIntervalMs);
+    }
+  };
+  billingTimer = window.setTimeout(() => {
+    void tick();
+  }, pollWarmupMs);
 }
 
 function renderPanelBody(resetScroll: boolean): void {
@@ -892,6 +942,7 @@ function beginReceipt(order: Order): void {
   if (order.notification_status === 'pending') {
     startPolling();
   }
+  startBillingPoll(order.id);
 }
 
 function startPolling(): void {

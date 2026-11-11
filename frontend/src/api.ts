@@ -288,6 +288,36 @@ export async function fetchOrder(id: string, signal?: AbortSignal): Promise<Orde
   return parseOrder(response.payload);
 }
 
+export interface BillingInfo {
+  billing_status: 'pending' | 'issued' | 'failed' | 'not_applicable';
+  invoice_number: string | null;
+  error: string | null;
+}
+
+function optionalString(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+// Semana 11: estado del comprobante. La facturación ocurre en el backend/worker;
+// el navegador solo consulta el estado, nunca llama al microservicio ni ve su token.
+export async function fetchBilling(id: string, signal?: AbortSignal): Promise<BillingInfo> {
+  const response = await request(`/api/v1/orders/${encodeURIComponent(id)}/billing`, { signal });
+  const value = response.payload;
+  if (!isRecord(value)) {
+    throw invalidResponse();
+  }
+  const status = value.billing_status;
+  if (status !== 'pending' && status !== 'issued' && status !== 'failed' && status !== 'not_applicable') {
+    throw invalidResponse();
+  }
+  return {
+    billing_status: status,
+    invoice_number: optionalString(value, 'invoice_number'),
+    error: optionalString(value, 'error')
+  };
+}
+
 export function friendlyError(error: unknown, context: 'catalog' | 'create' | 'order'): FriendlyError {
   const code = error instanceof ApiError ? error.code : 'UNKNOWN';
 

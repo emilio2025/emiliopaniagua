@@ -1,3 +1,4 @@
+import type { BillingInfo } from './api';
 import type { CartProblem } from './cart';
 import {
   MAX_DISTINCT_PRODUCTS,
@@ -578,6 +579,7 @@ export function receiptPanelNodes(
     banner,
     idBlock,
     notification,
+    billingNode(null),
     el('h3', { class: 'section-label' }, 'Productos'),
     items,
     total,
@@ -633,6 +635,42 @@ export function notificationNode(
     }
   }
 
+  return wrapper;
+}
+
+export function billingNode(info: BillingInfo | null): HTMLElement {
+  let tone: NotificationStatus = 'pending';
+  let label = 'Comprobante pendiente';
+  let detail = 'Estamos emitiendo el comprobante de demostración.';
+  if (info?.billing_status === 'issued') {
+    tone = 'sent';
+    label = 'Comprobante emitido';
+    detail = info.invoice_number ?? 'Comprobante de demostración emitido.';
+  } else if (info?.billing_status === 'failed') {
+    tone = 'failed';
+    label = 'Facturación pendiente de reintento';
+    detail = `El pedido sigue confirmado. La facturación se reintentará (${info.error ?? 'error'}).`;
+  } else if (info?.billing_status === 'pending' && info.error === 'BILLING_NOT_CONFIGURED') {
+    detail = 'La facturación aún no está configurada en este servidor. El pedido sigue confirmado.';
+  } else if (info?.billing_status === 'not_applicable') {
+    label = 'Sin comprobante';
+    detail = 'Este pedido se creó antes de activar la facturación.';
+  }
+  const wrapper = el('div', {
+    class: `notice notice-${tone}`,
+    role: 'status',
+    'aria-live': 'polite',
+    'data-receipt-billing': ''
+  });
+  wrapper.append(
+    el(
+      'div',
+      { class: 'notice-head' },
+      el('span', { class: `status-dot status-dot-${tone}`, 'aria-hidden': 'true' }),
+      el('p', { class: 'notice-title' }, label)
+    ),
+    el('p', { class: 'notice-text' }, detail)
+  );
   return wrapper;
 }
 

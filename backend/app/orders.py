@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from .db import CAMPAIGN, utcnow
 from .events import build_order_created_event, iso8601
-from .models import Order, OrderItem, Outbox, Product
+from .billing import build_invoice_request, public_billing_view
+from .models import BillingRecord, Order, OrderItem, Outbox, Product
 from .schemas import OrderCreate
 from .security import (
     ApiError,
@@ -178,6 +179,21 @@ async def _create_or_replay(
             )
         )
 
+        # Semana 11: tarea de facturación local con snapshot inmutable, en la misma
+        # transacción del pedido. La llamada remota la hace el worker después.
+        await session.flush()
+        session.add(
+            BillingRecord(
+                order_id=order_id,
+                dataset_id=dataset_id,
+                status="pending",
+                request=build_invoice_request(snapshot),
+                attempts=0,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        )
+
         await session.flush()
         return snapshot
 
@@ -262,3 +278,25 @@ async def get_order(
     snapshot = dict(order.snapshot)
     snapshot["notification_status"] = order.notification_status
     return JSONResponse(content=snapshot)
+
+
+@router.get("/api/v1/orders/{order_id}/billing")
+async def get_order_billing(
+    order_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    context: DatasetContext = Depends(dataset_context),
+) -> JSONResponse:
+    """Estado de facturación del pedido (Semana 11). No altera el JSON público del pedido."""
+    try:
+        identifier = uuid.UUID(order_id)
+    except (ValueError, AttributeError, TypeError):
+        raise ApiError(404, "NOT_FOUND", "Order not found") from None
+
+    order = await session.get(Order, identifier)
+    if order is None or order.dataset_id != context.dataset_id:
+        raise ApiError(404, "NOT_FOUND", "Order not found")
+
+    record = await session.get(BillingRecord, identifier)
+    settings = request.app.state.settings
+    return JSONResponse(content={"order_id": str(identifier), **public_billing_view(record, settings)})
