@@ -672,7 +672,14 @@ export function billingNode(info: BillingInfo | null): HTMLElement {
     el('p', { class: 'notice-text' }, detail)
   );
   if (info?.invoice) {
-    wrapper.append(invoicePreviewNode(info.invoice));
+    // Botón "Ver comprobante": abre/cierra la vista previa (elemento nativo <details>).
+    const toggle = el(
+      'details',
+      { class: 'invoice-toggle' },
+      el('summary', { class: 'button button-secondary invoice-button' }, icon('search'), el('span', {}, 'Ver comprobante')),
+      invoicePreviewNode(info.invoice)
+    );
+    wrapper.append(toggle);
   }
   return wrapper;
 }

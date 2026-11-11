@@ -2021,3 +2021,23 @@ svg {
   color: var(--ink-muted);
   font-size: 0.78rem;
 }
+
+.invoice-toggle {
+  margin-top: 12px;
+}
+
+.invoice-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.invoice-button::-webkit-details-marker {
+  display: none;
+}
+
+.invoice-toggle[open] .invoice-button span::after {
+  content: " ▲";
+}
