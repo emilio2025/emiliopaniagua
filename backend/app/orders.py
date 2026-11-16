@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .db import CAMPAIGN, utcnow
 from .events import build_order_created_event, iso8601
 from .billing import build_invoice_request, fetch_invoice, public_billing_view
-from .models import BillingRecord, Order, OrderItem, Outbox, Product
+from .auth import Customer, optional_customer
+from .models import BillingRecord, Order, OrderCustomer, OrderItem, Outbox, Product
 from .schemas import OrderCreate
 from .security import (
     ApiError,
@@ -48,6 +49,7 @@ async def _create_or_replay(
     idempotency_key: str,
     request_hash: str,
     payload: OrderCreate,
+    customer: Customer | None = None,
 ) -> dict[str, Any]:
     lock_key = _advisory_lock_key(dataset_id, idempotency_key)
     async with session.begin():
@@ -182,6 +184,17 @@ async def _create_or_replay(
         # Semana 11: tarea de facturación local con snapshot inmutable, en la misma
         # transacción del pedido. La llamada remota la hace el worker después.
         await session.flush()
+        if customer is not None:
+            session.add(
+                OrderCustomer(
+                    order_id=order_id,
+                    dataset_id=dataset_id,
+                    google_sub=customer.sub,
+                    email=customer.email,
+                    name=customer.name,
+                    created_at=created_at,
+                )
+            )
         session.add(
             BillingRecord(
                 order_id=order_id,
@@ -240,6 +253,7 @@ async def create_order(
     session: AsyncSession = Depends(get_session),
     context: DatasetContext = Depends(dataset_context),
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    customer: Customer | None = Depends(optional_customer),
 ) -> JSONResponse:
     key = validate_idempotency_key(idempotency_key)
     request_hash = _canonical_request_hash(payload)
@@ -249,6 +263,7 @@ async def create_order(
         key,
         request_hash,
         payload,
+        customer,
     )
     # Tarea C: se responde en cuanto el pedido queda confirmado; la notificación
     # es eventual y la procesa el worker (pending -> sent/failed).
@@ -305,3 +320,21 @@ async def get_order_billing(
         # navegador nunca ve el token ni llama a Supabase.
         view["invoice"] = await fetch_invoice(settings, record.invoice_id)
     return JSONResponse(content={"order_id": str(identifier), **view})
+
+
+@router.get("/api/v1/orders/{order_id}/customer")
+async def get_order_customer(
+    order_id: str,
+    session: AsyncSession = Depends(get_session),
+    context: DatasetContext = Depends(dataset_context),
+) -> JSONResponse:
+    """Nombre del cliente que compró (solo el nombre; el correo no se expone)."""
+    try:
+        identifier = uuid.UUID(order_id)
+    except (ValueError, AttributeError, TypeError):
+        raise ApiError(404, "NOT_FOUND", "Order not found") from None
+    order = await session.get(Order, identifier)
+    if order is None or order.dataset_id != context.dataset_id:
+        raise ApiError(404, "NOT_FOUND", "Order not found")
+    customer = await session.get(OrderCustomer, identifier)
+    return JSONResponse(content={"order_id": str(identifier), "customer_name": customer.name if customer else None})

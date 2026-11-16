@@ -131,6 +131,23 @@ class Notification(Base):
     )
 
 
+class OrderCustomer(Base):
+    """Cliente autenticado con Google que hizo el pedido (opcional, Semana 11)."""
+
+    __tablename__ = "order_customers"
+
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("orders.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    dataset_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    google_sub: Mapped[str] = mapped_column(String(64), nullable=False)
+    email: Mapped[str] = mapped_column(String(254), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
 class BillingRecord(Base):
     """Estado local de facturación (Semana 11). Independiente de notification_status."""
 

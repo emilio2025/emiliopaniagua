@@ -8,6 +8,7 @@ x-app: &app
     LAB_KEY: ${LAB_KEY:-}
     BILLING_BASE_URL: ${BILLING_BASE_URL:-}
     BILLING_TOKEN: ${BILLING_TOKEN:-}
+    GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   init: true
   restart: unless-stopped
   cap_drop: [ALL]

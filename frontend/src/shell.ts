@@ -16,6 +16,7 @@ export interface Elements {
   grid: HTMLElement;
   cartButton: HTMLButtonElement;
   cartCount: HTMLElement;
+  authSlot: HTMLElement;
   trackButton: HTMLButtonElement;
   panel: HTMLDialogElement;
   panelTitle: HTMLElement;
@@ -55,6 +56,8 @@ export function buildShell(): Elements {
   const cartCount = el('span', { class: 'cart-count', 'aria-hidden': 'true' }, '0');
   cartButton.append(icon('cart'), el('span', { class: 'cart-label' }, 'Carrito'), cartCount);
 
+  const authSlot = el('div', { class: 'auth-slot', 'aria-live': 'polite' });
+
   const trackButton = el(
     'button',
     { type: 'button', class: 'nav-link', 'aria-haspopup': 'dialog' },
@@ -78,6 +81,7 @@ export function buildShell(): Elements {
         { class: 'primary-nav', 'aria-label': 'Principal' },
         el('a', { class: 'nav-link', href: '#catalogo' }, 'Tienda'),
         trackButton,
+        authSlot,
         cartButton
       )
     )
@@ -275,6 +279,7 @@ export function buildShell(): Elements {
     grid,
     cartButton,
     cartCount,
+    authSlot,
     trackButton,
     panel,
     panelTitle,

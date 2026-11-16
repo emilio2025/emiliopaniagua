@@ -183,6 +183,7 @@ async function request(path: string, options: RequestOptions = {}): Promise<RawR
   try {
     const headers: Record<string, string> = {
       Accept: 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       ...options.headers
     };
     const body = options.body === undefined ? undefined : JSON.stringify(options.body);
@@ -358,6 +359,44 @@ export async function fetchBilling(id: string, signal?: AbortSignal): Promise<Bi
     error: optionalString(value, 'error'),
     invoice: parseInvoice(value.invoice)
   };
+}
+
+// Inicio de sesión con Google: token que el backend verifica.
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+
+export interface AuthConfig {
+  google_enabled: boolean;
+  google_client_id: string | null;
+}
+
+export async function fetchAuthConfig(): Promise<AuthConfig> {
+  const response = await request('/api/v1/auth/config');
+  const value = response.payload;
+  if (!isRecord(value)) {
+    throw invalidResponse();
+  }
+  return {
+    google_enabled: value.google_enabled === true,
+    google_client_id: optionalString(value, 'google_client_id')
+  };
+}
+
+export async function fetchMe(): Promise<{ name: string; email: string }> {
+  const response = await request('/api/v1/auth/me');
+  const value = response.payload;
+  if (!isRecord(value)) {
+    throw invalidResponse();
+  }
+  return { name: readString(value, 'name'), email: optionalString(value, 'email') ?? '' };
+}
+
+export async function fetchOrderCustomer(id: string, signal?: AbortSignal): Promise<string | null> {
+  const response = await request(`/api/v1/orders/${encodeURIComponent(id)}/customer`, { signal });
+  return isRecord(response.payload) ? optionalString(response.payload, 'customer_name') : null;
 }
 
 export function friendlyError(error: unknown, context: 'catalog' | 'create' | 'order'): FriendlyError {

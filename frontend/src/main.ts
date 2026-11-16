@@ -1,6 +1,16 @@
 import '@fontsource-variable/manrope';
 import './styles.css';
-import { ApiError, createOrder, fetchBilling, fetchCatalog, fetchOrder, friendlyError, isAbortError } from './api';
+import {
+  ApiError,
+  createOrder,
+  fetchBilling,
+  fetchCatalog,
+  fetchOrder,
+  fetchOrderCustomer,
+  friendlyError,
+  isAbortError
+} from './api';
+import { currentUser, initAuth, isAuthEnabled, renderSignInButton } from './auth';
 import type { BillingInfo } from './api';
 import {
   MAX_DISTINCT_PRODUCTS,
@@ -32,6 +42,7 @@ import {
   applyStockChip,
   billingNode,
   cartPanelNodes,
+  customerNode,
   configureAddButton,
   emptyCatalogNode,
   notificationNode,
@@ -75,6 +86,8 @@ let pollToken = 0;
 let pollAttempts = 0;
 let lastFocused: HTMLElement | null = null;
 let billingInfo: BillingInfo | null = null;
+let receiptCustomer: string | null = null;
+let customerToken = 0;
 let billingToken = 0;
 let billingTimer: number | null = null;
 let toastTimer: number | null = null;
@@ -104,6 +117,55 @@ function start(): void {
   updateCartCount(false);
   renderCatalogSkeletons();
   void loadCatalog();
+  void initAuth(ui.authSlot, onAuthChange);
+}
+
+function onAuthChange(): void {
+  if (panelMode === 'cart' && !creating) {
+    if (currentUser() && orderErrorCode === 'LOGIN_REQUIRED') {
+      orderError = '';
+      orderErrorCode = '';
+    }
+    renderPanel(false);
+    mountPanelSignIn();
+  }
+}
+
+function mountPanelSignIn(): void {
+  const alert = ui.panelBody.querySelector<HTMLElement>('[data-order-error]');
+  if (!alert || orderErrorCode !== 'LOGIN_REQUIRED' || currentUser()) {
+    return;
+  }
+  const holder = el('div', { class: 'auth-inline' });
+  alert.after(holder);
+  renderSignInButton(holder);
+}
+
+function updateReceiptCustomer(): void {
+  if (panelMode !== 'receipt') {
+    return;
+  }
+  const current = ui.panelBody.querySelector('[data-receipt-customer]');
+  if (current) {
+    current.replaceWith(customerNode(receiptCustomer));
+  }
+}
+
+function loadReceiptCustomer(orderId: string): void {
+  customerToken += 1;
+  const token = customerToken;
+  receiptCustomer = null;
+  updateReceiptCustomer();
+  void fetchOrderCustomer(orderId)
+    .then((name) => {
+      if (token !== customerToken) {
+        return;
+      }
+      receiptCustomer = name;
+      updateReceiptCustomer();
+      updateReceiptBilling();
+    })
+    .catch(() => undefined);
 }
 
 async function loadCatalog(options: { silent?: boolean } = {}): Promise<void> {
@@ -727,6 +789,7 @@ function renderPanel(resetScroll: boolean): void {
     ui.panel.removeAttribute('aria-busy');
   }
   renderPanelBody(resetScroll);
+  updateReceiptCustomer();
   updateReceiptBilling();
 }
 
@@ -736,7 +799,7 @@ function updateReceiptBilling(): void {
   }
   const current = ui.panelBody.querySelector('[data-receipt-billing]');
   if (current) {
-    current.replaceWith(billingNode(billingInfo));
+    current.replaceWith(billingNode(billingInfo, receiptCustomer));
   }
 }
 
@@ -887,6 +950,13 @@ async function confirmOrder(): Promise<void> {
   if (items.length === 0) {
     return;
   }
+  if (isAuthEnabled() && !currentUser()) {
+    orderError = 'Inicia sesión con Google para confirmar tu compra.';
+    orderErrorCode = 'LOGIN_REQUIRED';
+    renderPanel(false);
+    mountPanelSignIn();
+    return;
+  }
   const attempt = ensureAttempt(items);
   hideToast();
   creating = true;
@@ -942,6 +1012,7 @@ function beginReceipt(order: Order): void {
   if (order.notification_status === 'pending') {
     startPolling();
   }
+  loadReceiptCustomer(order.id);
   startBillingPoll(order.id);
 }
 

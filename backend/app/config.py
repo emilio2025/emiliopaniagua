@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     billing_retry_backoff_seconds: float = Field(default=1.0, ge=0.0, le=30.0)
     billing_poll_seconds: float = Field(default=2.0, ge=0.2, le=60.0)
 
+    # Inicio de sesión con Google (vacío = desactivado). Es un valor público.
+    google_client_id: str = ""
+
     @field_validator("database_url")
     @classmethod
     def normalize_database_url(cls, value: str) -> str:

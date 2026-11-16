@@ -23,10 +23,13 @@ from .models import Run
 
 IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{8,80}$")
 
+# Google Identity Services: solo se permite el cliente oficial de accounts.google.com.
+GOOGLE_GSI = "https://accounts.google.com/gsi/"
 CSP_VALUE = (
     "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
-    "img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; "
-    "connect-src 'self'; font-src 'self' data:; form-action 'self'"
+    f"img-src 'self' data:; style-src 'self' 'unsafe-inline' {GOOGLE_GSI}style; "
+    f"script-src 'self' {GOOGLE_GSI}client; frame-src {GOOGLE_GSI}; "
+    f"connect-src 'self' {GOOGLE_GSI}; font-src 'self' data:; form-action 'self'"
 )
 
 
@@ -265,7 +268,8 @@ class HardeningMiddleware:
         headers = {
             "X-Content-Type-Options": "nosniff",
             "X-Frame-Options": "DENY",
-            "Referrer-Policy": "no-referrer",
+            # Google Identity Services necesita el origen en el Referer.
+            "Referrer-Policy": "strict-origin-when-cross-origin",
             "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
             "Cross-Origin-Resource-Policy": "same-origin",
         }

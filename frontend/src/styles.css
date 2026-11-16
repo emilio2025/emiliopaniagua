@@ -2041,3 +2041,60 @@ svg {
 .invoice-toggle[open] .invoice-button span::after {
   content: " ▲";
 }
+
+/* Inicio de sesión con Google */
+.auth-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.auth-user {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.auth-inline {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.auth-error {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+}
+
+.receipt-customer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.receipt-customer[hidden] {
+  display: none;
+}
+
+.receipt-customer-label {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 720px) {
+  .auth-user {
+    max-width: 120px;
+  }
+}

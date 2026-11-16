@@ -578,6 +578,7 @@ export function receiptPanelNodes(
   return [
     banner,
     idBlock,
+    customerNode(null),
     notification,
     billingNode(null),
     el('h3', { class: 'section-label' }, 'Productos'),
@@ -638,7 +639,17 @@ export function notificationNode(
   return wrapper;
 }
 
-export function billingNode(info: BillingInfo | null): HTMLElement {
+export function customerNode(name: string | null): HTMLElement {
+  const node = el('div', { class: 'receipt-customer', 'data-receipt-customer': '' });
+  if (name) {
+    node.append(el('span', { class: 'receipt-customer-label' }, 'Cliente'), el('strong', {}, name));
+  } else {
+    node.hidden = true;
+  }
+  return node;
+}
+
+export function billingNode(info: BillingInfo | null, customerName: string | null = null): HTMLElement {
   let tone: NotificationStatus = 'pending';
   let label = 'Comprobante pendiente';
   let detail = 'Estamos emitiendo el comprobante de demostración.';
@@ -677,14 +688,14 @@ export function billingNode(info: BillingInfo | null): HTMLElement {
       'details',
       { class: 'invoice-toggle' },
       el('summary', { class: 'button button-secondary invoice-button' }, icon('search'), el('span', {}, 'Ver comprobante')),
-      invoicePreviewNode(info.invoice)
+      invoicePreviewNode(info.invoice, customerName)
     );
     wrapper.append(toggle);
   }
   return wrapper;
 }
 
-function invoicePreviewNode(invoice: InvoicePreview): HTMLElement {
+function invoicePreviewNode(invoice: InvoicePreview, customerName: string | null): HTMLElement {
   const lines = el('ul', { class: 'receipt-items' });
   for (const line of invoice.items) {
     lines.append(
@@ -720,6 +731,7 @@ function invoicePreviewNode(invoice: InvoicePreview): HTMLElement {
       'div',
       { class: 'invoice-meta' },
       row('Emisor', invoice.issuer_id),
+      ...(customerName ? [row('Cliente', customerName)] : []),
       row('Fecha', formatDateTime(invoice.created_at)),
       row('Pedido', invoice.order_id),
       row('Moneda', invoice.currency),
