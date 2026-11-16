@@ -197,6 +197,10 @@ class HardeningMiddleware:
             if path == "/api/v1/orders" and method == "POST":
                 limit = self.settings.rate_limit_orders_per_minute
                 bucket = "orders"
+            elif path in ("/api/v1/auth/login", "/api/v1/auth/register") and method == "POST":
+                # Límite estricto contra ataques de fuerza bruta a contraseñas.
+                limit = 10
+                bucket = "auth"
             else:
                 limit = self.settings.rate_limit_api_per_minute
                 bucket = "api"

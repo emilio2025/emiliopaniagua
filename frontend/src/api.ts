@@ -371,6 +371,32 @@ export function setAuthToken(token: string | null): void {
 export interface AuthConfig {
   google_enabled: boolean;
   google_client_id: string | null;
+  password_enabled: boolean;
+}
+
+export interface SessionResult {
+  token: string;
+  user: { name: string; email: string };
+}
+
+function parseSession(value: unknown): SessionResult {
+  if (!isRecord(value) || !isRecord(value.user)) {
+    throw invalidResponse();
+  }
+  return {
+    token: readString(value, 'token'),
+    user: { name: readString(value.user, 'name'), email: readString(value.user, 'email') }
+  };
+}
+
+export async function loginWithPassword(email: string, password: string): Promise<SessionResult> {
+  const response = await request('/api/v1/auth/login', { method: 'POST', body: { email, password } });
+  return parseSession(response.payload);
+}
+
+export async function registerAccount(name: string, email: string, password: string): Promise<SessionResult> {
+  const response = await request('/api/v1/auth/register', { method: 'POST', body: { name, email, password } });
+  return parseSession(response.payload);
 }
 
 export async function fetchAuthConfig(): Promise<AuthConfig> {
@@ -381,7 +407,8 @@ export async function fetchAuthConfig(): Promise<AuthConfig> {
   }
   return {
     google_enabled: value.google_enabled === true,
-    google_client_id: optionalString(value, 'google_client_id')
+    google_client_id: optionalString(value, 'google_client_id'),
+    password_enabled: value.password_enabled === true
   };
 }
 
