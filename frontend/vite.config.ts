@@ -13,7 +13,8 @@ function contentSecurityPolicy(): Plugin {
           attrs: {
             'http-equiv': 'Content-Security-Policy',
             content:
-              "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
+              // Google Identity Services (inicio de sesión): solo accounts.google.com/gsi/.
+              "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; frame-src https://accounts.google.com/gsi/; img-src 'self' data:; font-src 'self'; connect-src 'self' https://accounts.google.com/gsi/; base-uri 'self'; form-action 'self'; object-src 'none'"
           },
           injectTo: 'head-prepend'
         }
