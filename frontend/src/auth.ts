@@ -2,7 +2,7 @@
 // El ID token solo se guarda en memoria/sessionStorage de esta pestaña y se envía
 // al backend propio como Authorization: Bearer. El backend verifica la firma.
 import { fetchAuthConfig, fetchMe, setAuthToken } from './api';
-import { el } from './dom';
+import { el, icon } from './dom';
 
 interface GoogleCredentialResponse {
   credential?: string;
@@ -39,6 +39,7 @@ let user: AuthUser | null = null;
 let slot: HTMLElement | null = null;
 let onChange: (() => void) | null = null;
 let gsiReady: Promise<GoogleIdApi> | null = null;
+let loginDialog: HTMLDialogElement | null = null;
 
 export function isAuthEnabled(): boolean {
   return enabled;
@@ -124,6 +125,7 @@ async function handleCredential(token: string): Promise<void> {
   try {
     user = await fetchMe();
     storeToken(token);
+    loginDialog?.close();
   } catch {
     user = null;
     setAuthToken(null);
@@ -163,6 +165,71 @@ export function renderSignInButton(container: HTMLElement): void {
     });
 }
 
+function ensureLoginDialog(): HTMLDialogElement {
+  if (loginDialog) {
+    return loginDialog;
+  }
+  const close = el('button', { type: 'button', class: 'icon-button auth-dialog-close', 'aria-label': 'Cerrar' }, icon('close'));
+  const googleHolder = el('div', { class: 'auth-dialog-google' });
+  const dialog = el(
+    'dialog',
+    { class: 'auth-dialog', 'aria-labelledby': 'auth-dialog-title' },
+    el(
+      'div',
+      { class: 'auth-dialog-card' },
+      el(
+        'div',
+        { class: 'auth-dialog-head' },
+        el('h2', { id: 'auth-dialog-title', class: 'auth-dialog-title' }, 'Iniciar sesión'),
+        close
+      ),
+      el('p', { class: 'auth-dialog-text' }, 'Accede a FLASH para comprar y ver tu nombre en el comprobante.'),
+      el('p', { class: 'auth-dialog-label' }, 'Elige una opción'),
+      googleHolder,
+      el('p', { class: 'auth-dialog-note' }, 'Solo usamos tu nombre y correo de Google. No guardamos contraseñas.')
+    )
+  ) as HTMLDialogElement;
+  close.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) {
+      dialog.close();
+    }
+  });
+  document.body.append(dialog);
+  loginDialog = dialog;
+  return dialog;
+}
+
+export function openLogin(): void {
+  if (!enabled || user) {
+    return;
+  }
+  const dialog = ensureLoginDialog();
+  const holder = dialog.querySelector<HTMLElement>('.auth-dialog-google');
+  if (holder) {
+    void gsiReady
+      ?.then((api) => {
+        holder.replaceChildren();
+        api.renderButton(holder, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'continue_with',
+          shape: 'rectangular',
+          logo_alignment: 'left',
+          width: 300,
+          locale: 'es'
+        });
+      })
+      .catch(() => {
+        holder.replaceChildren(el('p', { class: 'auth-error' }, 'No se pudo cargar el inicio de sesión de Google.'));
+      });
+  }
+  if (!dialog.open) {
+    dialog.showModal();
+  }
+}
+
 function renderSlot(): void {
   if (!slot) {
     return;
@@ -177,9 +244,9 @@ function renderSlot(): void {
     slot.append(el('span', { class: 'auth-user', title: user.email }, `Hola, ${user.name}`), logout);
     return;
   }
-  const holder = el('div', { class: 'auth-google' });
-  slot.append(holder);
-  renderSignInButton(holder);
+  const login = el('button', { type: 'button', class: 'login-button', 'aria-haspopup': 'dialog' }, 'Iniciar sesión');
+  login.addEventListener('click', openLogin);
+  slot.append(login);
 }
 
 export async function initAuth(target: HTMLElement, changed: () => void): Promise<void> {

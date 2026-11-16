@@ -10,7 +10,7 @@ import {
   friendlyError,
   isAbortError
 } from './api';
-import { currentUser, initAuth, isAuthEnabled, renderSignInButton } from './auth';
+import { currentUser, initAuth, isAuthEnabled, openLogin } from './auth';
 import type { BillingInfo } from './api';
 import {
   MAX_DISTINCT_PRODUCTS,
@@ -136,9 +136,9 @@ function mountPanelSignIn(): void {
   if (!alert || orderErrorCode !== 'LOGIN_REQUIRED' || currentUser()) {
     return;
   }
-  const holder = el('div', { class: 'auth-inline' });
-  alert.after(holder);
-  renderSignInButton(holder);
+  const login = el('button', { type: 'button', class: 'login-button login-button-wide' }, 'Iniciar sesión');
+  login.addEventListener('click', openLogin);
+  alert.after(el('div', { class: 'auth-inline' }, login));
 }
 
 function updateReceiptCustomer(): void {
